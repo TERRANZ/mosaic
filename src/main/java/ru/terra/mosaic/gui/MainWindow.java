@@ -1,6 +1,5 @@
 package ru.terra.mosaic.gui;
 
-import javafx.application.Platform;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.embed.swing.SwingFXUtils;
@@ -9,11 +8,12 @@ import javafx.fxml.FXML;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.Slider;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.paint.Color;
+import javafx.scene.image.WritableImage;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
+import lombok.val;
 import ru.terra.mosaic.threading.ThreadingManager;
 import ru.terra.mosaic.util.AbstractWindow;
 import ru.terra.mosaic.util.AvgColor;
@@ -25,13 +25,17 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ResourceBundle;
-import java.util.stream.Stream;
+
+import static javafx.application.Platform.runLater;
+import static javafx.embed.swing.SwingFXUtils.fromFXImage;
+import static javafx.embed.swing.SwingFXUtils.toFXImage;
+import static javax.imageio.ImageIO.read;
+import static javax.imageio.ImageIO.write;
 
 /**
  * Date: 21.07.15
@@ -43,7 +47,7 @@ public class MainWindow extends AbstractWindow {
     @FXML
     public Label lblDir;
     @FXML
-    public ListView lvPics;
+    public ListView<String> lvPics;
     @FXML
     public Label lblStatus;
     @FXML
@@ -52,17 +56,16 @@ public class MainWindow extends AbstractWindow {
     public Slider slTileSize;
     @FXML
     private BufferedImage sourceImage;
-    private Map<String, AvgColor> tilesCache = new HashMap<>();
-    private ThreadingManager threadingManager;
+    private final Map<String, AvgColor> tilesCache = new HashMap<>();
+    private final ThreadingManager threadingManager = new ThreadingManager(20);
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        threadingManager = new ThreadingManager(20);
     }
 
     public void loadDb(ActionEvent actionEvent) {
-        final DirectoryChooser directoryChooser = new DirectoryChooser();
-        final File selectedDirectory = directoryChooser.showDialog(currStage);
+        val directoryChooser = new DirectoryChooser();
+        val selectedDirectory = directoryChooser.showDialog(currStage);
         if (selectedDirectory != null) {
             lblDir.setText(selectedDirectory.getAbsolutePath());
             new Service<Void>() {
@@ -72,17 +75,17 @@ public class MainWindow extends AbstractWindow {
                         @Override
                         protected Void call() throws Exception {
                             try {
-                                Stream<Path> files = Files.walk(Paths.get(selectedDirectory.toURI()));
+                                val files = Files.walk(Paths.get(selectedDirectory.toURI()));
                                 final int[] c = {0};
                                 java.util.List<File> pics = new ArrayList<>();
                                 files.filter(p -> p.toFile().isFile()).forEach(path -> pics.add(path.toFile()));
                                 pics.parallelStream().forEach(f -> threadingManager.execute(() -> {
                                     try {
-                                        BufferedImage bimg = ImageIO.read(f);
+                                        val bimg = read(f);
                                         synchronized (tilesCache) {
                                             tilesCache.put(f.getAbsolutePath(), averageColor(bimg));
                                         }
-                                        Platform.runLater(() -> {
+                                        runLater(() -> {
                                             lvPics.getItems().add(f.getAbsolutePath());
                                             c[0]++;
                                             lblStatus.setText("Обработано " + c[0] + " картинок");
@@ -105,21 +108,21 @@ public class MainWindow extends AbstractWindow {
         }
     }
 
-    private AvgColor averageColor(BufferedImage image) {
-        AvgColor avgColor = new AvgColor();
-        Image img = SwingFXUtils.toFXImage(image, null);
-        int width = (int) img.getWidth();
-        int height = (int) img.getHeight();
+    private AvgColor averageColor(final BufferedImage image) {
+        val avgColor = new AvgColor();
+        val img = toFXImage(image, null);
+        val width = (int) img.getWidth();
+        val height = (int) img.getHeight();
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                Color color = img.getPixelReader().getColor(x, y);
+                val color = img.getPixelReader().getColor(x, y);
                 avgColor.r += new Float(color.getRed());
                 avgColor.g += new Float(color.getGreen());
                 avgColor.b += new Float(color.getBlue());
             }
         }
 
-        long totalPixels = image.getWidth() * image.getHeight();
+        val totalPixels = image.getWidth() * image.getHeight();
         avgColor.r /= totalPixels;
         avgColor.g /= totalPixels;
         avgColor.b /= totalPixels;
@@ -127,12 +130,12 @@ public class MainWindow extends AbstractWindow {
     }
 
     public void saveResult(ActionEvent actionEvent) {
-        FileChooser fileChooser = new FileChooser();
+        val fileChooser = new FileChooser();
         fileChooser.setTitle("Save Image");
-        File file = fileChooser.showSaveDialog(currStage);
+        val file = fileChooser.showSaveDialog(currStage);
         if (file != null) {
             try {
-                ImageIO.write(SwingFXUtils.fromFXImage(ivResult.getImage(), null), "png", file);
+                write(fromFXImage(ivResult.getImage(), null), "png", file);
             } catch (IOException ex) {
                 ex.printStackTrace();
             }
@@ -140,25 +143,25 @@ public class MainWindow extends AbstractWindow {
     }
 
     public void openSrc(ActionEvent actionEvent) throws IOException {
-        FileChooser fileChooser = new FileChooser();
+        val fileChooser = new FileChooser();
         fileChooser.setTitle("Open source file");
         //Set extension filter
-        FileChooser.ExtensionFilter extFilterJPG = new FileChooser.ExtensionFilter("JPG files (*.jpg)", "*.jpg");
-        FileChooser.ExtensionFilter extFilterPNG = new FileChooser.ExtensionFilter("PNG files (*.png)", "*.png");
+        val extFilterJPG = new ExtensionFilter("JPG files (*.jpg)", "*.jpg");
+        val extFilterPNG = new ExtensionFilter("PNG files (*.png)", "*.png");
         fileChooser.getExtensionFilters().addAll(extFilterJPG, extFilterPNG);
-        File src = fileChooser.showOpenDialog(currStage);
+        val src = fileChooser.showOpenDialog(currStage);
         if (src != null) {
             sourceImage = ImageIO.read(src);
-            Image image = SwingFXUtils.toFXImage(sourceImage, null);
+            WritableImage image = toFXImage(sourceImage, null);
             ivSource.setImage(image);
         }
     }
 
     public static BufferedImage resize(BufferedImage img, int newW, int newH) {
-        int w = img.getWidth();
-        int h = img.getHeight();
-        BufferedImage dimg = new BufferedImage(newW, newH, img.getType());
-        Graphics2D g = dimg.createGraphics();
+        val w = img.getWidth();
+        val h = img.getHeight();
+        val dimg = new BufferedImage(newW, newH, img.getType());
+        val g = dimg.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(img, 0, 0, newW, newH, 0, 0, w, h, null);
         g.dispose();
@@ -167,7 +170,7 @@ public class MainWindow extends AbstractWindow {
 
     // возвращает Евклидово расстояние между двумя точками
     private Float distance(AvgColor p1, AvgColor p2) {
-        return new Float(Math.sqrt(sq(p2.r - p1.r) + sq(p2.g - p1.g) + sq(p2.b - p1.b)));
+        return (float) Math.sqrt(sq(p2.r - p1.r) + sq(p2.g - p1.g) + sq(p2.b - p1.b));
     }
 
     // возвращает квадрат
@@ -195,28 +198,28 @@ public class MainWindow extends AbstractWindow {
         System.out.println("awd");
         Map<String, AvgColor> tiles = new HashMap<>();
         tilesCache.forEach((fn, ac) -> tiles.put(fn, ac.cl()));
-        BufferedImage timg = new BufferedImage(sourceImage.getWidth(), sourceImage.getHeight(), sourceImage.getType());
+        val timg = new BufferedImage(sourceImage.getWidth(), sourceImage.getHeight(), sourceImage.getType());
 
-        Image img = SwingFXUtils.toFXImage(sourceImage, null);
-        int tileSize = (int) slTileSize.getValue();
+        val img = toFXImage(sourceImage, null);
+        val tileSize = (int) slTileSize.getValue();
         for (int y = 0; y < img.getHeight(); y += tileSize) {
             for (int x = 0; x < img.getWidth(); x += tileSize) {
-                Color color = img.getPixelReader().getColor(x, y);
-                AvgColor avgColor = new AvgColor(color.getRed(), color.getGreen(), color.getBlue(), 0);
-                String near = nearest(avgColor, tiles);
+                val color = img.getPixelReader().getColor(x, y);
+                val avgColor = new AvgColor((float) color.getRed(), (float) color.getGreen(), (float) color.getBlue(), (float) 0);
+                val near = nearest(avgColor, tiles);
 //                System.out.println("Nearest: " + near);
-                final int finalX = x;
-                final int finalY = y;
+                val finalX = x;
+                val finalY = y;
                 threadingManager.execute(() -> {
                     if (near != null) {
                         BufferedImage newTile = null;
                         try {
-                            newTile = resize(ImageIO.read(new File(near)), tileSize, tileSize);
+                            newTile = resize(read(new File(near)), tileSize, tileSize);
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
                         timg.getGraphics().drawImage(newTile, finalX, finalY, (img1, infoflags, x1, y1, width, height) -> true);
-                        Platform.runLater(() -> ivResult.setImage(SwingFXUtils.toFXImage(timg, null)));
+                        runLater(() -> ivResult.setImage(toFXImage(timg, null)));
                     }
                 });
             }

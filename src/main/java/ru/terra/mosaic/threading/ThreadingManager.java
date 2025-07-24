@@ -1,5 +1,7 @@
 package ru.terra.mosaic.threading;
 
+import lombok.val;
+
 import java.util.LinkedList;
 
 /**
@@ -7,14 +9,11 @@ import java.util.LinkedList;
  * Time: 15:35
  */
 public class ThreadingManager {
-    private final int nThreads;
-    private final PoolWorker[] threads;
-    private final LinkedList queue;
+    private final LinkedList<Runnable> queue;
 
-    public ThreadingManager(int nThreads) {
-        this.nThreads = nThreads;
-        queue = new LinkedList();
-        threads = new PoolWorker[nThreads];
+    public ThreadingManager(final int nThreads) {
+        queue = new LinkedList<>();
+        val threads = new PoolWorker[nThreads];
 
         for (int i = 0; i < nThreads; i++) {
             threads[i] = new PoolWorker();
@@ -22,7 +21,7 @@ public class ThreadingManager {
         }
     }
 
-    public void execute(Runnable r) {
+    public void execute(final Runnable r) {
         synchronized (queue) {
             queue.addLast(r);
             queue.notify();
@@ -42,7 +41,7 @@ public class ThreadingManager {
                         }
                     }
 
-                    r = (Runnable) queue.removeFirst();
+                    r = queue.removeFirst();
                 }
 
                 // If we don't catch RuntimeException,

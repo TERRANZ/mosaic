@@ -4,6 +4,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import lombok.val;
 
 import java.io.IOException;
 import java.net.URL;
@@ -14,17 +15,17 @@ import java.net.URL;
  */
 public class StageHelper {
     public static <T extends AbstractWindow> Pair<Stage, T> openWindow(String fxmlFileName, String title) {
-        String fxmlFile = C.FXML + fxmlFileName;
-        URL location = StageHelper.class.getResource(fxmlFile);
+        val fxmlFile = C.FXML + fxmlFileName;
+        val location = StageHelper.class.getResource(fxmlFile);
         Parent root = null;
-        FXMLLoader fxmlLoader = new FXMLLoader();
+        val fxmlLoader = new FXMLLoader();
         try {
             root = fxmlLoader.load(location.openStream());
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        Stage stage = new Stage();
+        val stage = new Stage();
         ((T) fxmlLoader.getController()).setCurrStage(stage);
         stage.setTitle(title);
         stage.setScene(new Scene(root));
