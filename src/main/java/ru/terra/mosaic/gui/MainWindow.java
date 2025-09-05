@@ -1,8 +1,10 @@
 package ru.terra.mosaic.gui;
 
+import com.vk.api.sdk.client.VkApiClient;
+import com.vk.api.sdk.client.actors.UserActor;
+import com.vk.api.sdk.httpclient.HttpTransportClient;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
@@ -13,6 +15,7 @@ import javafx.scene.image.WritableImage;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
+import lombok.SneakyThrows;
 import lombok.val;
 import ru.terra.mosaic.threading.ThreadingManager;
 import ru.terra.mosaic.util.AbstractWindow;
@@ -42,6 +45,9 @@ import static javax.imageio.ImageIO.write;
  * Time: 16:26
  */
 public class MainWindow extends AbstractWindow {
+    private static final Integer APP_ID = 5005860;
+    private static final String CLIENT_SECRET = "";
+    private static final String REDIRECT_URI = "";
     @FXML
     public ImageView ivResult;
     @FXML
@@ -224,5 +230,18 @@ public class MainWindow extends AbstractWindow {
                 });
             }
         }
+    }
+
+    @SneakyThrows
+    public void loginVK(final ActionEvent actionEvent) {
+        val transportClient = new HttpTransportClient();
+        val vk = new VkApiClient(transportClient);
+        final String code = "";
+        val authResponse = vk.oAuth()
+                .userAuthorizationCodeFlow(APP_ID, CLIENT_SECRET, REDIRECT_URI, code)
+                .execute();
+
+        val actor = new UserActor((long) authResponse.getUserId(), authResponse.getAccessToken());
+
     }
 }
